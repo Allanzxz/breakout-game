@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Breakout</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <img id="logo" src="images/senac_logo_branco.png" alt="Logo Senac">
+    <div id="game-container">
+        <!-- Tela Principal -->
+        <div id="main-menu" class="screen flex">
+            <h1>Breakout</h1>
+            <button id="start-game-btn" class="button">Jogar</button>
+            <button id="view-ranking-btn" class="button">Ranking</button>
+        </div>
+
+        <!-- Tela de Seleção de Dificuldade -->
+        <div id="difficulty-screen" class="screen">
+            <h1>Escolha a Dificuldade</h1>
+            <button id="easy-btn" class="button">Fácil</button>
+            <button id="medium-btn" class="button">Médio</button>
+            <button id="hard-btn" class="button">Difícil</button>
+            <button id="back-to-menu-from-difficulty" class="button">Menu Principal</button>
+        </div>
+
+        <!-- Tela de Ranking -->
+        <div id="ranking-screen" class="screen">
+            <h1>Ranking</h1>
+            <ol id="ranking-list">
+                <!-- As pontuações serão inseridas aqui via JavaScript -->
+            </ol>
+            <button id="back-to-menu-btn" class="button">Menu Principal</button>
+        </div>
+
+        <!-- Tela do Jogo -->
+        <div id="game-screen" class="screen">
+            <div id="game-info">
+                <div id="score-display">Pontos: 0</div>
+                <div id="lives-display">Vidas: 3</div>
+                <div id="timer-display">Tempo: 0:00</div>
+            </div>
+            <canvas id="game-canvas" width="640" height="480"></canvas>
+            <div id="buttons-container">
+                <button id="restart-btn" class="button">Reiniciar</button>
+            </div>
+        </div>
+
+        <!-- Tela de Fim de Jogo (Vitória/Derrota) -->
+        <div id="end-game-screen" class="screen">
+            <h1 id="end-game-message"></h1>
+            <p id="final-score-message"></p>
+            <div id="name-input-container">
+                <input type="text" id="name-input" placeholder="Digite seu nome">
+                <button id="save-score-btn" class="button">Salvar Pontuação</button>
+            </div>
+            <button id="back-from-end-btn" class="button">Menu Principal</button>
+        </div>
+    </div>
+</body>
+</html>
