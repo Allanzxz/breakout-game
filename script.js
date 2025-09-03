@@ -27,6 +27,7 @@ const ball = {
   speed: 0,
   color: "#ffc857", // Amarelo
   isMoving: false,
+  isImmuneToPaddle: false, // Nova variável para evitar o bug de lançamento
 };
 
 // Propriedades da barra (paddle)
@@ -55,6 +56,7 @@ let totalBricksInLevel = 0;
 let rightPressed = false;
 let leftPressed = false;
 let mouseX = 0;
+let isControllingWithKeyboard = false; // Variável para controlar qual input está ativo
 
 // Referências aos elementos da interface
 const mainMenu = document.getElementById("main-menu");
@@ -70,6 +72,19 @@ const endGameMessage = document.getElementById("end-game-message");
 const finalScoreMessage = document.getElementById("final-score-message");
 const nameInput = document.getElementById("name-input");
 const rankingList = document.getElementById("ranking-list");
+
+// --- Efeitos Sonoros ---
+const sounds = {
+  paddleHit: new Audio("audio/hit-da-bola.wav"),
+  wallHit: new Audio("audio/paddle-border-hit.mp3"),
+  brickHit: new Audio("audio/bloco-som.wav"),
+  gameOver: new Audio("audio/game-over.mp3"),
+};
+
+function playSound(sound) {
+  sound.currentTime = 0;
+  sound.play();
+}
 
 // --- Funções de Inicialização e Desenho ---
 
@@ -135,6 +150,7 @@ function resetGame() {
   ball.dy = 0;
   ball.speed = levels[currentLevelIndex].speed;
   ball.isMoving = false;
+  ball.isImmuneToPaddle = false;
 
   paddle.width = 100;
   paddle.x = (canvas.width - paddle.width) / 2;
@@ -152,6 +168,7 @@ function startNextLevel() {
   ball.dx = 0;
   ball.dy = 0;
   ball.isMoving = false;
+  ball.isImmuneToPaddle = false;
   paddle.x = (canvas.width - paddle.width) / 2;
 
   createBricks();
@@ -248,6 +265,7 @@ function collisionDetection() {
           currentBrick.status = 0;
           score++;
           updateScoreDisplay();
+          playSound(sounds.brickHit);
 
           let brokenBricks = 0;
           for (let col of bricks) {
@@ -272,15 +290,26 @@ function collisionDetection() {
 }
 
 function movePaddle() {
-  if (rightPressed && paddle.x < canvas.width - paddle.width) {
-    paddle.x += 7;
-  } else if (leftPressed && paddle.x > 0) {
-    paddle.x -= 7;
-  } else if (mouseX !== 0) {
+  if (isControllingWithKeyboard) {
+    if (rightPressed) {
+      paddle.x += 7;
+    } else if (leftPressed) {
+      paddle.x -= 7;
+    }
+  } else {
+    // Usa o mouse se não estiver controlando pelo teclado
     const relativeX = mouseX - canvas.getBoundingClientRect().left;
     if (relativeX > 0 && relativeX < canvas.width) {
       paddle.x = relativeX - paddle.width / 2;
     }
+  }
+
+  // Limita a posição da raquete para que ela não saia do canvas
+  if (paddle.x < 0) {
+    paddle.x = 0;
+  }
+  if (paddle.x + paddle.width > canvas.width) {
+    paddle.x = canvas.width - paddle.width;
   }
 }
 
@@ -290,33 +319,43 @@ function updateGame() {
   if (ball.isMoving) {
     ball.x += ball.dx;
     ball.y += ball.dy;
+
+    // Colisão com as paredes laterais
+    if (
+      ball.x + ball.dx > canvas.width - ball.radius ||
+      ball.x + ball.dx < ball.radius
+    ) {
+      ball.dx = -ball.dx;
+      playSound(sounds.wallHit);
+    }
+    // Colisão com a parede superior
+    if (ball.y + ball.dy < ball.radius) {
+      ball.dy = -ball.dy;
+      playSound(sounds.wallHit);
+    }
+    // Colisão com a raquete (agora com a verificação de imunidade)
+    else if (
+      !ball.isImmuneToPaddle &&
+      ball.y + ball.radius >= paddle.y &&
+      ball.y < paddle.y + paddle.height
+    ) {
+      if (ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
+        playSound(sounds.paddleHit);
+        const hitPoint = ball.x - (paddle.x + paddle.width / 2);
+        const normalizedHit = hitPoint / (paddle.width / 2);
+        const bounceAngle = normalizedHit * (Math.PI / 3);
+
+        ball.dx = ball.speed * Math.sin(bounceAngle);
+        ball.dy = -ball.speed * Math.cos(bounceAngle);
+      }
+    }
   } else {
+    // Se a bola não estiver se movendo, ela fica na raquete
     ball.x = paddle.x + paddle.width / 2;
     ball.y = paddle.y - ball.radius;
   }
 
-  if (
-    ball.x + ball.dx > canvas.width - ball.radius ||
-    ball.x + ball.dx < ball.radius
-  ) {
-    ball.dx = -ball.dx;
-  }
-  if (ball.y + ball.dy < ball.radius) {
-    ball.dy = -ball.dy;
-  } else if (
-    ball.y + ball.radius >= paddle.y &&
-    ball.y < paddle.y + paddle.height
-  ) {
-    if (ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
-      const hitPoint = ball.x - (paddle.x + paddle.width / 2);
-      const normalizedHit = hitPoint / (paddle.width / 2);
-      const bounceAngle = normalizedHit * (Math.PI / 3);
-
-      ball.dx = ball.speed * Math.sin(bounceAngle);
-      ball.dy = -ball.speed * Math.cos(bounceAngle);
-    }
-  }
-
+  // Fim do jogo (perda de vida)
   if (ball.y - ball.radius > canvas.height) {
     lives--;
     updateLivesDisplay();
@@ -328,6 +367,7 @@ function updateGame() {
       ball.dx = 0;
       ball.dy = 0;
       ball.isMoving = false;
+      ball.isImmuneToPaddle = false;
       paddle.x = (canvas.width - paddle.width) / 2;
     }
   }
@@ -419,6 +459,7 @@ function endGame(result) {
     endGameMessage.textContent = "Parabéns, Você Venceu o Jogo!";
   } else {
     endGameMessage.textContent = "Fim de Jogo! Você Perdeu.";
+    playSound(sounds.gameOver);
   }
   finalScoreMessage.textContent = `Sua pontuação final: ${score}`;
 }
@@ -441,7 +482,7 @@ function saveScore() {
   scores.push({ name: playerName, score: score });
   localStorage.setItem("breakoutScores", JSON.stringify(scores));
 
-  nameInput.value = "";
+  nameInput.value = " ";
   showScreen("ranking");
 }
 
@@ -465,16 +506,32 @@ function loadAndDisplayRanking() {
   });
 }
 
-// --- Funções de Eventos ---
+// --- Funções de Eventos (agora com controle por teclado e mouse!) ---
 
 function setupEventListeners() {
+  // Eventos de teclado
   document.addEventListener("keydown", (e) => {
+    if (
+      e.key === "Right" ||
+      e.key === "ArrowRight" ||
+      e.key === "Left" ||
+      e.key === "ArrowLeft"
+    ) {
+      isControllingWithKeyboard = true;
+    }
+
     if (e.key === "Right" || e.key === "ArrowRight") {
       rightPressed = true;
     } else if (e.key === "Left" || e.key === "ArrowLeft") {
       leftPressed = true;
+    } else if (e.key === " ") {
+      // Lançar a bola com a barra de espaço
+      if (gameState === "playing" && !ball.isMoving) {
+        launchBall();
+      }
     }
   });
+
   document.addEventListener("keyup", (e) => {
     if (e.key === "Right" || e.key === "ArrowRight") {
       rightPressed = false;
@@ -483,20 +540,34 @@ function setupEventListeners() {
     }
   });
 
+  // Eventos de mouse
   gameCanvas.addEventListener("mousemove", (e) => {
     if (gameState === "playing") {
+      isControllingWithKeyboard = false; // Desativa o controle do teclado
       mouseX = e.clientX;
     }
   });
 
+  // Lançar a bola com o clique do mouse
   gameCanvas.addEventListener("click", () => {
     if (gameState === "playing" && !ball.isMoving) {
-      ball.isMoving = true;
-      ball.dx = levels[currentLevelIndex].speed;
-      ball.dy = -levels[currentLevelIndex].speed;
+      launchBall();
     }
   });
 
+  function launchBall() {
+    ball.isMoving = true;
+    ball.isImmuneToPaddle = true;
+    ball.dx = levels[currentLevelIndex].speed;
+    ball.dy = -levels[currentLevelIndex].speed;
+
+    // Remove a imunidade da bola após um pequeno atraso
+    setTimeout(() => {
+      ball.isImmuneToPaddle = false;
+    }, 200); // 200 milissegundos
+  }
+
+  // Eventos de botões da interface
   document
     .getElementById("start-game-btn")
     .addEventListener("click", () => startGame());
