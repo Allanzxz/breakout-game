@@ -13,14 +13,12 @@
 <body>
     <img id="logo" src="images/senac_logo_branco.png" alt="Logo Senac">
     <div id="game-container">
-        <!-- Tela Principal -->
         <div id="main-menu" class="screen flex">
             <h1>Breakout</h1>
             <button id="start-game-btn" class="button">Jogar</button>
             <button id="view-ranking-btn" class="button">Ranking</button>
         </div>
 
-        <!-- Tela de Seleção de Dificuldade -->
         <div id="difficulty-screen" class="screen">
             <h1>Escolha a Dificuldade</h1>
             <button id="easy-btn" class="button">Fácil</button>
@@ -29,16 +27,13 @@
             <button id="back-to-menu-from-difficulty" class="button">Menu Principal</button>
         </div>
 
-        <!-- Tela de Ranking -->
         <div id="ranking-screen" class="screen">
             <h1>Ranking</h1>
             <ol id="ranking-list">
-                <!-- As pontuações serão inseridas aqui via JavaScript -->
-            </ol>
+                </ol>
             <button id="back-to-menu-btn" class="button">Menu Principal</button>
         </div>
 
-        <!-- Tela do Jogo -->
         <div id="game-screen" class="screen">
             <div id="game-info">
                 <div id="score-display">Pontos: 0</div>
@@ -47,11 +42,22 @@
             </div>
             <canvas id="game-canvas" width="640" height="480"></canvas>
             <div id="buttons-container">
-                <button id="restart-btn" class="button">Reiniciar</button>
+                <button id="pause-btn" class="button">Pausar</button>
             </div>
         </div>
 
-        <!-- Tela de Fim de Jogo (Vitória/Derrota) -->
+        <div id="pause-screen" class="screen">
+            <h1>Jogo Pausado</h1>
+            <button id="continue-btn" class="button">Continuar Jogo</button>
+            <button id="restart-from-pause-btn" class="button">Reiniciar</button>
+            <button id="back-to-menu-from-pause" class="button">Menu Principal</button>
+        </div>
+
+        <div id="level-transition-screen" class="screen">
+            <h1 id="level-transition-message"></h1>
+            <button id="next-level-btn" class="button">Próximo Nível</button>
+        </div>
+
         <div id="end-game-screen" class="screen">
             <h1 id="end-game-message"></h1>
             <p id="final-score-message"></p>

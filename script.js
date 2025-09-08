@@ -1,5 +1,5 @@
 // Variáveis de estado do jogo
-let gameState = "menu"; // Estados: 'menu', 'playing', 'win', 'lose', 'ranking'
+let gameState = "menu"; // Estados: 'menu', 'playing', 'win', 'lose', 'ranking', 'paused'
 let canvas, ctx;
 let score = 0;
 let lives = 3;
@@ -27,7 +27,6 @@ const ball = {
   speed: 0,
   color: "#ffc857", // Amarelo
   isMoving: false,
-  isImmuneToPaddle: false, // Nova variável para evitar o bug de lançamento
 };
 
 // Propriedades da barra (paddle)
@@ -52,11 +51,12 @@ const brick = {
 let bricks = [];
 let totalBricksInLevel = 0;
 
+const wallHitAudio = new Audio("sounds/");
+
 // Variáveis de controle de entrada
 let rightPressed = false;
 let leftPressed = false;
-let mouseX = 0;
-let isControllingWithKeyboard = false; // Variável para controlar qual input está ativo
+let mouseX = null;
 
 // Referências aos elementos da interface
 const mainMenu = document.getElementById("main-menu");
@@ -72,19 +72,18 @@ const endGameMessage = document.getElementById("end-game-message");
 const finalScoreMessage = document.getElementById("final-score-message");
 const nameInput = document.getElementById("name-input");
 const rankingList = document.getElementById("ranking-list");
+const levelTransitionScreen = document.getElementById(
+  "level-transition-screen"
+);
 
-// --- Efeitos Sonoros ---
-const sounds = {
-  paddleHit: new Audio("audio/hit-da-bola.wav"),
-  wallHit: new Audio("audio/paddle-border-hit.mp3"),
-  brickHit: new Audio("audio/bloco-som.wav"),
-  gameOver: new Audio("audio/game-over.mp3"),
-};
-
-function playSound(sound) {
-  sound.currentTime = 0;
-  sound.play();
-}
+// Novos elementos para a funcionalidade de Pausa
+const pauseScreen = document.getElementById("pause-screen");
+const pauseBtn = document.getElementById("pause-btn");
+const continueBtn = document.getElementById("continue-btn");
+const restartFromPauseBtn = document.getElementById("restart-from-pause-btn");
+const backToMenuFromPauseBtn = document.getElementById(
+  "back-to-menu-from-pause"
+);
 
 // --- Funções de Inicialização e Desenho ---
 
@@ -150,7 +149,6 @@ function resetGame() {
   ball.dy = 0;
   ball.speed = levels[currentLevelIndex].speed;
   ball.isMoving = false;
-  ball.isImmuneToPaddle = false;
 
   paddle.width = 100;
   paddle.x = (canvas.width - paddle.width) / 2;
@@ -161,6 +159,17 @@ function resetGame() {
 
 function startNextLevel() {
   currentLevelIndex++;
+  if (currentLevelIndex >= levels.length) {
+    endGame("win");
+    return;
+  }
+  document.getElementById(
+    "level-transition-message"
+  ).textContent = `Parabéns! Nível ${currentLevelIndex + 1} Concluído!`;
+  showScreen("level-transition");
+}
+
+function continueToNextLevel() {
   timeRemaining = 180;
   ball.x = canvas.width / 2;
   ball.y = canvas.height - 30;
@@ -168,10 +177,10 @@ function startNextLevel() {
   ball.dx = 0;
   ball.dy = 0;
   ball.isMoving = false;
-  ball.isImmuneToPaddle = false;
   paddle.x = (canvas.width - paddle.width) / 2;
 
   createBricks();
+  showScreen("playing");
 }
 
 function drawBackground() {
@@ -237,6 +246,18 @@ function updateTimerDisplay() {
   timerDisplay.textContent = `Tempo: ${formattedTime}`;
 }
 
+//Efeitos Sonoros
+const sounds = {
+  paddleHit: new Audio("audio/hit-da-bola.wav"),
+  wallHit: new Audio("audio/paddle-border-hit.mp3"),
+  brickHit: new Audio("audio/brick-hit.mp3"),
+  gameOver: new Audio("audio/game-over.mp3"),
+};
+function playSound(sound) {
+  sound.currentTime = 0;
+  sound.play();
+}
+
 // --- Funções de Lógica do Jogo ---
 
 function collisionDetection() {
@@ -265,7 +286,6 @@ function collisionDetection() {
           currentBrick.status = 0;
           score++;
           updateScoreDisplay();
-          playSound(sounds.brickHit);
 
           let brokenBricks = 0;
           for (let col of bricks) {
@@ -277,11 +297,7 @@ function collisionDetection() {
           }
 
           if (brokenBricks === totalBricksInLevel) {
-            if (currentLevelIndex < levels.length - 1) {
-              startNextLevel();
-            } else {
-              endGame("win");
-            }
+            startNextLevel();
           }
         }
       }
@@ -290,26 +306,17 @@ function collisionDetection() {
 }
 
 function movePaddle() {
-  if (isControllingWithKeyboard) {
-    if (rightPressed) {
-      paddle.x += 7;
-    } else if (leftPressed) {
-      paddle.x -= 7;
-    }
-  } else {
-    // Usa o mouse se não estiver controlando pelo teclado
+  // Prioriza o controle do teclado se as setas estiverem pressionadas
+  if (rightPressed && paddle.x < canvas.width - paddle.width) {
+    paddle.x += 7;
+  } else if (leftPressed && paddle.x > 0) {
+    paddle.x -= 7;
+  } else if (mouseX !== null) {
+    // Somente move com o mouse se ele for o último a ser usado
     const relativeX = mouseX - canvas.getBoundingClientRect().left;
     if (relativeX > 0 && relativeX < canvas.width) {
       paddle.x = relativeX - paddle.width / 2;
     }
-  }
-
-  // Limita a posição da raquete para que ela não saia do canvas
-  if (paddle.x < 0) {
-    paddle.x = 0;
-  }
-  if (paddle.x + paddle.width > canvas.width) {
-    paddle.x = canvas.width - paddle.width;
   }
 }
 
@@ -319,43 +326,33 @@ function updateGame() {
   if (ball.isMoving) {
     ball.x += ball.dx;
     ball.y += ball.dy;
-
-    // Colisão com as paredes laterais
-    if (
-      ball.x + ball.dx > canvas.width - ball.radius ||
-      ball.x + ball.dx < ball.radius
-    ) {
-      ball.dx = -ball.dx;
-      playSound(sounds.wallHit);
-    }
-    // Colisão com a parede superior
-    if (ball.y + ball.dy < ball.radius) {
-      ball.dy = -ball.dy;
-      playSound(sounds.wallHit);
-    }
-    // Colisão com a raquete (agora com a verificação de imunidade)
-    else if (
-      !ball.isImmuneToPaddle &&
-      ball.y + ball.radius >= paddle.y &&
-      ball.y < paddle.y + paddle.height
-    ) {
-      if (ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
-        playSound(sounds.paddleHit);
-        const hitPoint = ball.x - (paddle.x + paddle.width / 2);
-        const normalizedHit = hitPoint / (paddle.width / 2);
-        const bounceAngle = normalizedHit * (Math.PI / 3);
-
-        ball.dx = ball.speed * Math.sin(bounceAngle);
-        ball.dy = -ball.speed * Math.cos(bounceAngle);
-      }
-    }
   } else {
-    // Se a bola não estiver se movendo, ela fica na raquete
     ball.x = paddle.x + paddle.width / 2;
     ball.y = paddle.y - ball.radius;
   }
 
-  // Fim do jogo (perda de vida)
+  if (
+    ball.x + ball.dx > canvas.width - ball.radius ||
+    ball.x + ball.dx < ball.radius
+  ) {
+    ball.dx = -ball.dx;
+  }
+  if (ball.y + ball.dy < ball.radius) {
+    ball.dy = -ball.dy;
+  } else if (
+    ball.y + ball.radius >= paddle.y &&
+    ball.y < paddle.y + paddle.height
+  ) {
+    if (ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
+      const hitPoint = ball.x - (paddle.x + paddle.width / 2);
+      const normalizedHit = hitPoint / (paddle.width / 2);
+      const bounceAngle = normalizedHit * (Math.PI / 3);
+
+      ball.dx = ball.speed * Math.sin(bounceAngle);
+      ball.dy = -ball.speed * Math.cos(bounceAngle);
+    }
+  }
+
   if (ball.y - ball.radius > canvas.height) {
     lives--;
     updateLivesDisplay();
@@ -367,7 +364,6 @@ function updateGame() {
       ball.dx = 0;
       ball.dy = 0;
       ball.isMoving = false;
-      ball.isImmuneToPaddle = false;
       paddle.x = (canvas.width - paddle.width) / 2;
     }
   }
@@ -407,6 +403,14 @@ function gameLoop() {
 }
 
 // --- Funções de Estado do Jogo (Telas) ---
+function togglePause() {
+  isPaused = !isPaused;
+  if (isPaused) {
+    showScreen("paused");
+  } else {
+    showScreen("playing");
+  }
+}
 
 function showScreen(screenName) {
   mainMenu.style.display = "none";
@@ -414,6 +418,8 @@ function showScreen(screenName) {
   rankingScreen.style.display = "none";
   gameScreen.style.display = "none";
   endGameScreen.style.display = "none";
+  levelTransitionScreen.style.display = "none";
+  pauseScreen.style.display = "none";
 
   if (gameLoopId) {
     cancelAnimationFrame(gameLoopId);
@@ -423,6 +429,9 @@ function showScreen(screenName) {
     case "menu":
       mainMenu.style.display = "flex";
       gameState = "menu";
+      break;
+    case "difficulty":
+      difficultyScreen.style.display = "flex";
       break;
     case "ranking":
       loadAndDisplayRanking();
@@ -439,16 +448,46 @@ function showScreen(screenName) {
       endGameScreen.style.display = "flex";
       gameState = "end-game";
       break;
+    case "level-transition":
+      levelTransitionScreen.style.display = "flex";
+      gameState = "level-transition";
+      break;
+    case "paused":
+      pauseScreen.style.display = "flex";
+      gameState = "paused";
+      break;
   }
 }
 
 function startGame() {
+  currentLevelIndex = 0;
   resetGame();
   showScreen("playing");
 }
 
+// Função de reinício modificada
 function restartGame() {
-  resetGame();
+  isPaused = false;
+  // O jogo é reiniciado no nível atual.
+  // As vidas, pontuação e temporizador são resetados.
+  lives = 3;
+  score = 0;
+  timeRemaining = 180;
+
+  // A raquete e a bola são reposicionadas
+  ball.x = canvas.width / 2;
+  ball.y = canvas.height - 30;
+  ball.dx = 0;
+  ball.dy = 0;
+  ball.isMoving = false;
+
+  paddle.x = (canvas.width - paddle.width) / 2;
+
+  createBricks(); // Recria os tijolos do nível atual
+  updateLivesDisplay();
+  updateScoreDisplay();
+  updateTimerDisplay();
+
   showScreen("playing");
 }
 
@@ -459,7 +498,6 @@ function endGame(result) {
     endGameMessage.textContent = "Parabéns, Você Venceu o Jogo!";
   } else {
     endGameMessage.textContent = "Fim de Jogo! Você Perdeu.";
-    playSound(sounds.gameOver);
   }
   finalScoreMessage.textContent = `Sua pontuação final: ${score}`;
 }
@@ -506,32 +544,30 @@ function loadAndDisplayRanking() {
   });
 }
 
-// --- Funções de Eventos (agora com controle por teclado e mouse!) ---
+// --- Funções de Eventos ---
 
 function setupEventListeners() {
-  // Eventos de teclado
   document.addEventListener("keydown", (e) => {
-    if (
-      e.key === "Right" ||
-      e.key === "ArrowRight" ||
-      e.key === "Left" ||
-      e.key === "ArrowLeft"
-    ) {
-      isControllingWithKeyboard = true;
-    }
-
     if (e.key === "Right" || e.key === "ArrowRight") {
       rightPressed = true;
+      mouseX = null;
     } else if (e.key === "Left" || e.key === "ArrowLeft") {
       leftPressed = true;
-    } else if (e.key === " ") {
-      // Lançar a bola com a barra de espaço
+      mouseX = null;
+    }
+    if (e.key === " ") {
       if (gameState === "playing" && !ball.isMoving) {
-        launchBall();
+        ball.isMoving = true;
+        ball.dx = levels[currentLevelIndex].speed;
+        ball.dy = -levels[currentLevelIndex].speed;
+      }
+    }
+    if (e.key === "p" || e.key === "P") {
+      if (gameState === "playing") {
+        togglePause();
       }
     }
   });
-
   document.addEventListener("keyup", (e) => {
     if (e.key === "Right" || e.key === "ArrowRight") {
       rightPressed = false;
@@ -540,34 +576,21 @@ function setupEventListeners() {
     }
   });
 
-  // Eventos de mouse
   gameCanvas.addEventListener("mousemove", (e) => {
     if (gameState === "playing") {
-      isControllingWithKeyboard = false; // Desativa o controle do teclado
       mouseX = e.clientX;
     }
   });
 
-  // Lançar a bola com o clique do mouse
   gameCanvas.addEventListener("click", () => {
     if (gameState === "playing" && !ball.isMoving) {
-      launchBall();
+      ball.isMoving = true;
+      ball.dx = levels[currentLevelIndex].speed;
+      ball.dy = -levels[currentLevelIndex].speed;
     }
   });
 
-  function launchBall() {
-    ball.isMoving = true;
-    ball.isImmuneToPaddle = true;
-    ball.dx = levels[currentLevelIndex].speed;
-    ball.dy = -levels[currentLevelIndex].speed;
-
-    // Remove a imunidade da bola após um pequeno atraso
-    setTimeout(() => {
-      ball.isImmuneToPaddle = false;
-    }, 200); // 200 milissegundos
-  }
-
-  // Eventos de botões da interface
+  // Event listeners para a tela principal e de ranking
   document
     .getElementById("start-game-btn")
     .addEventListener("click", () => startGame());
@@ -577,13 +600,23 @@ function setupEventListeners() {
   document
     .getElementById("back-to-menu-btn")
     .addEventListener("click", () => showScreen("menu"));
-  document.getElementById("restart-btn").addEventListener("click", restartGame);
+
+  // Event listeners para a tela de fim de jogo e ranking
   document
     .getElementById("save-score-btn")
     .addEventListener("click", saveScore);
   document
     .getElementById("back-from-end-btn")
     .addEventListener("click", () => showScreen("menu"));
+  document
+    .getElementById("next-level-btn")
+    .addEventListener("click", () => continueToNextLevel());
+
+  // Event listeners para a funcionalidade de pausa
+  pauseBtn.addEventListener("click", togglePause);
+  continueBtn.addEventListener("click", togglePause);
+  restartFromPauseBtn.addEventListener("click", restartGame);
+  backToMenuFromPauseBtn.addEventListener("click", () => showScreen("menu"));
 }
 
 window.onload = init;
