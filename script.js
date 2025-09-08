@@ -158,14 +158,19 @@ function resetGame() {
 }
 
 function startNextLevel() {
+  const finishedLevel = currentLevelIndex + 1;
   currentLevelIndex++;
+
+  // Altera a lógica para verificar se o jogo foi vencido
   if (currentLevelIndex >= levels.length) {
     endGame("win");
     return;
   }
+
+  // Agora a mensagem mostra o nível que foi concluído
   document.getElementById(
     "level-transition-message"
-  ).textContent = `Parabéns! Nível ${currentLevelIndex + 1} Concluído!`;
+  ).textContent = `Parabéns! Nível ${finishedLevel} Concluído!`;
   showScreen("level-transition");
 }
 
@@ -465,16 +470,12 @@ function startGame() {
   showScreen("playing");
 }
 
-// Função de reinício modificada
 function restartGame() {
   isPaused = false;
-  // O jogo é reiniciado no nível atual.
-  // As vidas, pontuação e temporizador são resetados.
   lives = 3;
   score = 0;
   timeRemaining = 180;
 
-  // A raquete e a bola são reposicionadas
   ball.x = canvas.width / 2;
   ball.y = canvas.height - 30;
   ball.dx = 0;
@@ -483,7 +484,7 @@ function restartGame() {
 
   paddle.x = (canvas.width - paddle.width) / 2;
 
-  createBricks(); // Recria os tijolos do nível atual
+  createBricks();
   updateLivesDisplay();
   updateScoreDisplay();
   updateTimerDisplay();
@@ -495,7 +496,7 @@ function endGame(result) {
   cancelAnimationFrame(gameLoopId);
   showScreen("end-game");
   if (result === "win") {
-    endGameMessage.textContent = "Parabéns, Você Venceu o Jogo!";
+    endGameMessage.textContent = "Parabéns, Você Zerou o Jogo!";
   } else {
     endGameMessage.textContent = "Fim de Jogo! Você Perdeu.";
   }

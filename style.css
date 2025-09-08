@@ -23,7 +23,7 @@ body {
 }
 
 .screen {
-    width: 100%;
+    width: 700px;
     max-width: 680px;
     min-height: 480px;
     display: none;
