@@ -51,8 +51,6 @@ const brick = {
 let bricks = [];
 let totalBricksInLevel = 0;
 
-const wallHitAudio = new Audio("sounds/");
-
 // Variáveis de controle de entrada
 let rightPressed = false;
 let leftPressed = false;
@@ -84,6 +82,30 @@ const restartFromPauseBtn = document.getElementById("restart-from-pause-btn");
 const backToMenuFromPauseBtn = document.getElementById(
   "back-to-menu-from-pause"
 );
+
+// Efeitos Sonoros
+const sounds = {
+  paddleHit: new Audio("audio/hit-da-bola.wav"),
+  wallHit: new Audio("audio/paddle-border-hit.mp3"),
+  brickHit: new Audio("audio/bloco-som.wav"),
+  gameOver: new Audio("audio/game-over.mp3"),
+};
+
+function playSound(sound) {
+  if (gameState === "playing" && !isPaused) {
+    sound.currentTime = 0;
+    sound.play().catch((e) => console.error("Erro ao tocar áudio:", e));
+  }
+}
+
+function stopAllSounds() {
+  for (const key in sounds) {
+    if (sounds.hasOwnProperty(key)) {
+      sounds[key].pause();
+      sounds[key].currentTime = 0;
+    }
+  }
+}
 
 // --- Funções de Inicialização e Desenho ---
 
@@ -161,13 +183,11 @@ function startNextLevel() {
   const finishedLevel = currentLevelIndex + 1;
   currentLevelIndex++;
 
-  // Altera a lógica para verificar se o jogo foi vencido
   if (currentLevelIndex >= levels.length) {
     endGame("win");
     return;
   }
 
-  // Agora a mensagem mostra o nível que foi concluído
   document.getElementById(
     "level-transition-message"
   ).textContent = `Parabéns! Nível ${finishedLevel} Concluído!`;
@@ -251,18 +271,6 @@ function updateTimerDisplay() {
   timerDisplay.textContent = `Tempo: ${formattedTime}`;
 }
 
-//Efeitos Sonoros
-const sounds = {
-  paddleHit: new Audio("audio/hit-da-bola.wav"),
-  wallHit: new Audio("audio/paddle-border-hit.mp3"),
-  brickHit: new Audio("audio/brick-hit.mp3"),
-  gameOver: new Audio("audio/game-over.mp3"),
-};
-function playSound(sound) {
-  sound.currentTime = 0;
-  sound.play();
-}
-
 // --- Funções de Lógica do Jogo ---
 
 function collisionDetection() {
@@ -288,6 +296,8 @@ function collisionDetection() {
             ball.dx = -ball.dx;
           }
 
+          playSound(sounds.brickHit);
+
           currentBrick.status = 0;
           score++;
           updateScoreDisplay();
@@ -311,13 +321,11 @@ function collisionDetection() {
 }
 
 function movePaddle() {
-  // Prioriza o controle do teclado se as setas estiverem pressionadas
   if (rightPressed && paddle.x < canvas.width - paddle.width) {
     paddle.x += 7;
   } else if (leftPressed && paddle.x > 0) {
     paddle.x -= 7;
   } else if (mouseX !== null) {
-    // Somente move com o mouse se ele for o último a ser usado
     const relativeX = mouseX - canvas.getBoundingClientRect().left;
     if (relativeX > 0 && relativeX < canvas.width) {
       paddle.x = relativeX - paddle.width / 2;
@@ -328,6 +336,7 @@ function movePaddle() {
 function updateGame() {
   if (gameState !== "playing" || isPaused) return;
 
+  // Se a bola não estiver se movendo, a posição dela acompanha a raquete.
   if (ball.isMoving) {
     ball.x += ball.dx;
     ball.y += ball.dy;
@@ -336,25 +345,35 @@ function updateGame() {
     ball.y = paddle.y - ball.radius;
   }
 
+  // Colisão com as paredes laterais
   if (
     ball.x + ball.dx > canvas.width - ball.radius ||
     ball.x + ball.dx < ball.radius
   ) {
     ball.dx = -ball.dx;
+    playSound(sounds.wallHit);
   }
+
+  // Colisão com a parede superior
   if (ball.y + ball.dy < ball.radius) {
     ball.dy = -ball.dy;
+    playSound(sounds.wallHit);
   } else if (
     ball.y + ball.radius >= paddle.y &&
     ball.y < paddle.y + paddle.height
   ) {
+    // Colisão com a raquete
     if (ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
-      const hitPoint = ball.x - (paddle.x + paddle.width / 2);
-      const normalizedHit = hitPoint / (paddle.width / 2);
-      const bounceAngle = normalizedHit * (Math.PI / 3);
+      // Só toca o som se a bola estiver se movendo
+      if (ball.isMoving) {
+        const hitPoint = ball.x - (paddle.x + paddle.width / 2);
+        const normalizedHit = hitPoint / (paddle.width / 2);
+        const bounceAngle = normalizedHit * (Math.PI / 3);
 
-      ball.dx = ball.speed * Math.sin(bounceAngle);
-      ball.dy = -ball.speed * Math.cos(bounceAngle);
+        ball.dx = ball.speed * Math.sin(bounceAngle);
+        ball.dy = -ball.speed * Math.cos(bounceAngle);
+        playSound(sounds.paddleHit);
+      }
     }
   }
 
@@ -364,6 +383,7 @@ function updateGame() {
     if (lives <= 0) {
       endGame("lose");
     } else {
+      // Reposiciona a bola na raquete quando o jogador perde uma vida
       ball.x = canvas.width / 2;
       ball.y = canvas.height - 30;
       ball.dx = 0;
@@ -418,6 +438,7 @@ function togglePause() {
 }
 
 function showScreen(screenName) {
+  stopAllSounds();
   mainMenu.style.display = "none";
   difficultyScreen.style.display = "none";
   rankingScreen.style.display = "none";
@@ -499,6 +520,7 @@ function endGame(result) {
     endGameMessage.textContent = "Parabéns, Você Zerou o Jogo!";
   } else {
     endGameMessage.textContent = "Fim de Jogo! Você Perdeu.";
+    playSound(sounds.gameOver);
   }
   finalScoreMessage.textContent = `Sua pontuação final: ${score}`;
 }
@@ -591,7 +613,6 @@ function setupEventListeners() {
     }
   });
 
-  // Event listeners para a tela principal e de ranking
   document
     .getElementById("start-game-btn")
     .addEventListener("click", () => startGame());
@@ -602,7 +623,6 @@ function setupEventListeners() {
     .getElementById("back-to-menu-btn")
     .addEventListener("click", () => showScreen("menu"));
 
-  // Event listeners para a tela de fim de jogo e ranking
   document
     .getElementById("save-score-btn")
     .addEventListener("click", saveScore);
@@ -613,7 +633,6 @@ function setupEventListeners() {
     .getElementById("next-level-btn")
     .addEventListener("click", () => continueToNextLevel());
 
-  // Event listeners para a funcionalidade de pausa
   pauseBtn.addEventListener("click", togglePause);
   continueBtn.addEventListener("click", togglePause);
   restartFromPauseBtn.addEventListener("click", restartGame);
