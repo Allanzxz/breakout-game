@@ -73,6 +73,7 @@ const rankingList = document.getElementById("ranking-list");
 const levelTransitionScreen = document.getElementById(
   "level-transition-screen"
 );
+const nextLevelBtn = document.getElementById("next-level-btn");
 
 // Novos elementos para a funcionalidade de Pausa
 const pauseScreen = document.getElementById("pause-screen");
@@ -336,7 +337,6 @@ function movePaddle() {
 function updateGame() {
   if (gameState !== "playing" || isPaused) return;
 
-  // Se a bola não estiver se movendo, a posição dela acompanha a raquete.
   if (ball.isMoving) {
     ball.x += ball.dx;
     ball.y += ball.dy;
@@ -345,7 +345,6 @@ function updateGame() {
     ball.y = paddle.y - ball.radius;
   }
 
-  // Colisão com as paredes laterais
   if (
     ball.x + ball.dx > canvas.width - ball.radius ||
     ball.x + ball.dx < ball.radius
@@ -354,7 +353,6 @@ function updateGame() {
     playSound(sounds.wallHit);
   }
 
-  // Colisão com a parede superior
   if (ball.y + ball.dy < ball.radius) {
     ball.dy = -ball.dy;
     playSound(sounds.wallHit);
@@ -362,9 +360,7 @@ function updateGame() {
     ball.y + ball.radius >= paddle.y &&
     ball.y < paddle.y + paddle.height
   ) {
-    // Colisão com a raquete
     if (ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
-      // Só toca o som se a bola estiver se movendo
       if (ball.isMoving) {
         const hitPoint = ball.x - (paddle.x + paddle.width / 2);
         const normalizedHit = hitPoint / (paddle.width / 2);
@@ -383,7 +379,6 @@ function updateGame() {
     if (lives <= 0) {
       endGame("lose");
     } else {
-      // Reposiciona a bola na raquete quando o jogador perde uma vida
       ball.x = canvas.width / 2;
       ball.y = canvas.height - 30;
       ball.dx = 0;
@@ -429,6 +424,7 @@ function gameLoop() {
 
 // --- Funções de Estado do Jogo (Telas) ---
 function togglePause() {
+  // A função de pausa apenas muda o estado e a tela
   isPaused = !isPaused;
   if (isPaused) {
     showScreen("paused");
@@ -477,6 +473,13 @@ function showScreen(screenName) {
     case "level-transition":
       levelTransitionScreen.style.display = "flex";
       gameState = "level-transition";
+      nextLevelBtn.addEventListener(
+        "click",
+        () => {
+          continueToNextLevel();
+        },
+        { once: true }
+      );
       break;
     case "paused":
       pauseScreen.style.display = "flex";
@@ -585,6 +588,7 @@ function setupEventListeners() {
         ball.dy = -levels[currentLevelIndex].speed;
       }
     }
+    // Agora, a tecla 'P' também pausa o jogo
     if (e.key === "p" || e.key === "P") {
       if (gameState === "playing") {
         togglePause();
@@ -613,6 +617,20 @@ function setupEventListeners() {
     }
   });
 
+  // --- LÓGICA DE PAUSA CORRIGIDA ---
+  // Apenas ativa o listener se o botão for encontrado, e ele é o único responsável pela pausa
+  if (pauseBtn) {
+    pauseBtn.addEventListener("click", () => {
+      if (gameState === "playing") {
+        togglePause();
+      }
+    });
+  }
+
+  continueBtn.addEventListener("click", togglePause);
+  restartFromPauseBtn.addEventListener("click", restartGame);
+  backToMenuFromPauseBtn.addEventListener("click", () => showScreen("menu"));
+
   document
     .getElementById("start-game-btn")
     .addEventListener("click", () => startGame());
@@ -629,14 +647,16 @@ function setupEventListeners() {
   document
     .getElementById("back-from-end-btn")
     .addEventListener("click", () => showScreen("menu"));
-  document
-    .getElementById("next-level-btn")
-    .addEventListener("click", () => continueToNextLevel());
 
-  pauseBtn.addEventListener("click", togglePause);
-  continueBtn.addEventListener("click", togglePause);
-  restartFromPauseBtn.addEventListener("click", restartGame);
-  backToMenuFromPauseBtn.addEventListener("click", () => showScreen("menu"));
+  if (nextLevelBtn) {
+    nextLevelBtn.addEventListener(
+      "click",
+      () => {
+        continueToNextLevel();
+      },
+      { once: true }
+    );
+  }
 }
 
 window.onload = init;
